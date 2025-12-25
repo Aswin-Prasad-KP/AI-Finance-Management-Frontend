@@ -1,31 +1,36 @@
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/foundation.dart';
 
-// This service handles all data encryption and decryption logic.
 class EncryptionService {
   final _secureStorage = const FlutterSecureStorage();
   static const _secretKeyStorageIdentifier = 'app_secret_key';
 
-  // FIX: Renamed from 'encrypt' to 'encryptData' to avoid name collision.
   Future<String?> encryptData(String plainText) async {
     final key = await _getSecretKeyForEncryption();
-    if (key == null) return null;
+    if (key == null) {
+      debugPrint("Encryption failed: Secret key not found.");
+      return null;
+    }
 
-    final iv = encrypt.IV.fromLength(16);
+    final iv = encrypt.IV.fromLength(16); // A new random IV for each encryption
     final encrypter = encrypt.Encrypter(encrypt.AES(key));
 
     final encrypted = encrypter.encrypt(plainText, iv: iv);
+    // Prepend the IV to the encrypted data for decryption
     return '${iv.base64}:${encrypted.base64}';
   }
 
-  // FIX: Renamed from 'decrypt' to 'decryptData' for consistency.
   Future<String?> decryptData(String encryptedText) async {
     final key = await _getSecretKeyForEncryption();
-    if (key == null) return null;
+    if (key == null) {
+      debugPrint("Decryption failed: Secret key not found.");
+      return null;
+    }
 
     try {
       final parts = encryptedText.split(':');
-      if (parts.length != 2) return null; // Basic validation
+      if (parts.length != 2) return null;
 
       final iv = encrypt.IV.fromBase64(parts[0]);
       final encryptedData = encrypt.Encrypted.fromBase64(parts[1]);
@@ -33,7 +38,7 @@ class EncryptionService {
 
       return encrypter.decrypt(encryptedData, iv: iv);
     } catch (e) {
-      print("Decryption failed: $e");
+      debugPrint("Decryption failed: $e");
       return null;
     }
   }
@@ -41,7 +46,8 @@ class EncryptionService {
   Future<encrypt.Key?> _getSecretKeyForEncryption() async {
     final secretKeyString = await getSecretKey();
     if (secretKeyString == null) return null;
-    return encrypt.Key.fromUtf8(secretKeyString);
+    // Ensure the key is padded or truncated to 32 bytes for AES-256
+    return encrypt.Key.fromUtf8(secretKeyString.padRight(32).substring(0, 32));
   }
 
   Future<String?> getSecretKey() async {

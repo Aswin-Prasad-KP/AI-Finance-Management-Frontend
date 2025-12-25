@@ -1,159 +1,203 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import '../models/category_model.dart';
-import '../models/transaction_model.dart';
-import '../services/firestore_service.dart';
-import '../widgets/custom_text_field.dart';
+import 'package:uuid/uuid.dart';
 
-enum TransactionType { expense, income }
+import '../models/transaction_model.dart';
+import '../models/category_model.dart';
+import '../models/income_source_model.dart';
+import '../services/firestore_service.dart'; // THE CHANGE
 
 class AddExpenseScreen extends StatefulWidget {
-  const AddExpenseScreen({super.key});
+  final String? prefilledTitle;
+  final double? prefilledAmount;
+
+  const AddExpenseScreen({
+    super.key,
+    this.prefilledTitle,
+    this.prefilledAmount,
+  });
 
   @override
   State<AddExpenseScreen> createState() => _AddExpenseScreenState();
 }
 
 class _AddExpenseScreenState extends State<AddExpenseScreen> {
+  // All state logic is identical to the mock
+  final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _amountController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
+  bool _isExpense = true;
   ExpenseCategory? _selectedCategory;
-  TransactionType _transactionType = TransactionType.expense;
+  IncomeSource? _selectedIncomeSource;
 
-  Future<void> _submitData() async {
-    final firestoreService = Provider.of<FirestoreService?>(context, listen: false);
-    if (firestoreService == null || _amountController.text.isEmpty || _selectedCategory == null) {
-      return;
+  // --- THE FIX: Pre-fill the controllers in initState ---
+  @override
+  void initState() {
+    super.initState();
+    if (widget.prefilledTitle != null) {
+      _titleController.text = widget.prefilledTitle!;
     }
-
-    final enteredAmount = double.tryParse(_amountController.text);
-    if (enteredAmount == null || enteredAmount <= 0) {
-      return;
+    if (widget.prefilledAmount != null) {
+      _amountController.text = widget.prefilledAmount!.toStringAsFixed(2);
     }
+  }
 
-    final newTransaction = Transaction(
-      id: '', // Firestore will generate this
-      title: _titleController.text.isEmpty ? _selectedCategory!.name : _titleController.text,
-      amount: enteredAmount,
-      date: _selectedDate,
-      category: _selectedCategory!,
-      isExpense: _transactionType == TransactionType.expense,
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _presentDatePicker() async {
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2022),
+      lastDate: DateTime.now(),
     );
+    if (pickedDate != null && pickedDate != _selectedDate) {
+      setState(() {
+        _selectedDate = pickedDate;
+      });
+    }
+  }
 
-    await firestoreService.addTransaction(newTransaction);
 
-    if (mounted) {
+  void _submitData() {
+    if (_formKey.currentState!.validate()) {
+      final amount = double.tryParse(_amountController.text) ?? 0.0;
+      if (amount <= 0) return;
+
+      // THE CHANGE: Create the real Transaction object
+      final newTransaction = Transaction(
+        id: const Uuid().v4(),
+        title: _titleController.text,
+        amount: amount,
+        date: _selectedDate,
+        isExpense: _isExpense,
+        category: _isExpense ? _selectedCategory : null,
+        incomeSource: !_isExpense ? _selectedIncomeSource : null,
+      );
+
+      // THE CHANGE: Use the real FirestoreService
+      Provider.of<FirestoreService>(context, listen: false)
+          .addTransaction(newTransaction);
+
       Navigator.of(context).pop();
     }
   }
 
-  void _presentDatePicker() {
-    showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-    ).then((pickedDate) {
-      if (pickedDate == null) {
-        return;
-      }
-      setState(() {
-        _selectedDate = pickedDate;
-      });
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Add Transaction', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.check),
-            onPressed: _submitData,
-          ),
-        ],
+    return Container(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        // Make space for the keyboard
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            CupertinoSlidingSegmentedControl<TransactionType>(
-              groupValue: _transactionType,
-              backgroundColor: Colors.grey.shade200,
-              thumbColor: _transactionType == TransactionType.expense ? Colors.red.shade400 : Colors.green.shade400,
-              onValueChanged: (value) {
-                if (value != null) {
-                  setState(() {
-                    _transactionType = value;
-                  });
-                }
-              },
-              children: {
-                TransactionType.expense: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  child: Text('Expense', style: GoogleFonts.poppins(color: _transactionType == TransactionType.expense ? Colors.white : Colors.black, fontWeight: FontWeight.w600)),
-                ),
-                TransactionType.income: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  child: Text('Income', style: GoogleFonts.poppins(color: _transactionType == TransactionType.income ? Colors.white : Colors.black, fontWeight: FontWeight.w600)),
-                ),
-              },
-            ),
-            const SizedBox(height: 20),
-            CustomTextField(
-              controller: _amountController,
-              hintText: 'Amount',
-              icon: Icons.currency_rupee_rounded,
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 20),
-            CustomTextField(
-              controller: _titleController,
-              hintText: 'Title (Optional)',
-              icon: Icons.title_rounded,
-            ),
-            const SizedBox(height: 20),
-            Text('Select Category', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8.0,
-              runSpacing: 8.0,
-              children: defaultCategories.map((category) {
-                final isSelected = _selectedCategory?.name == category.name;
-                return ChoiceChip(
-                  label: Text(category.name),
-                  avatar: Icon(category.icon, color: isSelected ? Colors.white : Theme.of(context).primaryColor),
-                  selected: isSelected,
-                  selectedColor: Theme.of(context).primaryColor,
-                  labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black),
-                  onSelected: (selected) {
-                    setState(() {
-                      _selectedCategory = category;
-                    });
-                  },
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(child: Text('Date: ${MaterialLocalizations.of(context).formatShortDate(_selectedDate)}')),
-                TextButton(
-                  onPressed: _presentDatePicker,
-                  child: const Text('Choose Date', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          ],
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                _isExpense ? 'Add Expense' : 'Add Income',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
+              _buildTypeToggle(),
+              const SizedBox(height: 20),
+              TextFormField(
+                controller: _amountController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(labelText: 'Amount', prefixIcon: const Icon(Icons.attach_money)),
+                validator: (v) => v!.isEmpty ? 'Please enter an amount' : null,
+              ),
+              const SizedBox(height: 20),
+              TextFormField(
+                controller: _titleController,
+                decoration: InputDecoration(labelText: 'Note / Title', prefixIcon: const Icon(Icons.edit)),
+                validator: (v) => v!.isEmpty ? 'Please enter a note' : null,
+              ),
+              const SizedBox(height: 20),
+              _isExpense
+                  ? _buildCategoryDropdown()
+                  : _buildIncomeSourceDropdown(),
+              const SizedBox(height: 20),
+              _buildDatePicker(),
+              const SizedBox(height: 30),
+              ElevatedButton(
+                onPressed: _submitData,
+                style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16)),
+                child: const Text('Save Transaction'),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
-}
 
+  Widget _buildTypeToggle() {
+    return ToggleButtons(
+      isSelected: [_isExpense, !_isExpense],
+      onPressed: (index) {
+        setState(() {
+          _isExpense = index == 0;
+        });
+      },
+      borderRadius: BorderRadius.circular(8),
+      fillColor: Theme.of(context).primaryColor.withOpacity(0.1),
+      selectedColor: Theme.of(context).primaryColor,
+      children: const [
+        Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Text('Expense')),
+        Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Text('Income')),
+      ],
+    );
+  }
+
+  Widget _buildCategoryDropdown() {
+    return DropdownButtonFormField<ExpenseCategory>(
+      value: _selectedCategory,
+      hint: const Text('Select Category'),
+      items: defaultCategories.map((c) => DropdownMenuItem(value: c, child: Text(c.name))).toList(),
+      onChanged: (v) => setState(() => _selectedCategory = v),
+      validator: (v) => v == null ? 'Please select a category' : null,
+    );
+  }
+
+  Widget _buildIncomeSourceDropdown() {
+    return DropdownButtonFormField<IncomeSource>(
+      value: _selectedIncomeSource,
+      hint: const Text('Select Income Source'),
+      items: defaultIncomeSources.map((s) => DropdownMenuItem(value: s, child: Text(s.name))).toList(),
+      onChanged: (v) => setState(() => _selectedIncomeSource = v),
+      validator: (v) => v == null ? 'Please select a source' : null,
+    );
+  }
+
+  Widget _buildDatePicker() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(DateFormat.yMMMd().format(_selectedDate)),
+        TextButton(onPressed: _presentDatePicker, child: const Text('Choose Date')),
+      ],
+    );
+  }
+}

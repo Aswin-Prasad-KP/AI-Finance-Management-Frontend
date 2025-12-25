@@ -38,7 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     }
-    // No need for an else, the AuthWrapper will handle navigation on success.
+    // The AuthWrapper handles navigation on success.
 
     if (mounted) {
       setState(() {
@@ -49,6 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // UI remains the same as the mock
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -58,7 +59,7 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  Icons.shield_moon,
+                  Icons.shield_moon_rounded,
                   size: 80,
                   color: Theme.of(context).primaryColor,
                 ),
@@ -83,6 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   controller: _emailController,
                   hintText: 'Email',
                   icon: Icons.email_outlined,
+                  keyboardType: TextInputType.emailAddress,
                 ),
                 const SizedBox(height: 20),
                 CustomTextField(
@@ -92,8 +94,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   isPassword: true,
                 ),
                 const SizedBox(height: 30),
-
-                // Show error message if it exists
                 if (_errorMessage != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16.0),
@@ -103,8 +103,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       textAlign: TextAlign.center,
                     ),
                   ),
-
-                // Login Button
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(

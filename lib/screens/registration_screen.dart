@@ -40,23 +40,24 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     if (mounted) {
       if (user == null) {
-        // Error message will be printed by the service, show a generic one here
         setState(() {
-          _errorMessage = 'Could not create account. The email may already be in use.';
+          _errorMessage = 'Could not create account. The email may already be in use or the password is too weak.';
         });
       } else {
-        // On success, pop back to the login screen or directly to dashboard
         Navigator.of(context).pop();
       }
     }
 
-    setState(() {
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // UI remains the same as the mock
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -74,7 +75,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  Icons.shield_moon,
+                  Icons.shield_moon_rounded,
                   size: 80,
                   color: Theme.of(context).primaryColor,
                 ),
@@ -99,11 +100,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   controller: _emailController,
                   hintText: 'Email',
                   icon: Icons.email_outlined,
+                  keyboardType: TextInputType.emailAddress,
                 ),
                 const SizedBox(height: 20),
                 CustomTextField(
                   controller: _passwordController,
-                  hintText: 'Password',
+                  hintText: 'Password (min. 6 characters)',
                   icon: Icons.lock_outline,
                   isPassword: true,
                 ),
@@ -115,7 +117,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   isPassword: true,
                 ),
                 const SizedBox(height: 30),
-
                 if (_errorMessage != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16.0),
@@ -125,7 +126,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       textAlign: TextAlign.center,
                     ),
                   ),
-
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -164,3 +164,4 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
   }
 }
+

@@ -1,19 +1,16 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import './category_model.dart';
 import './income_source_model.dart';
 
-// Represents a transaction that occurs on a regular schedule
 class RecurringTransaction {
   final String id;
   final String title;
   final double amount;
   final bool isExpense;
-  final String frequency; // e.g., "Monthly", "Weekly"
+  final String frequency;
   final DateTime nextDate;
-  // --- NEW FIELDS ---
-  final DateTime? endDate; // Nullable for transactions that never end
+  final DateTime? endDate;
   final bool neverEnds;
-
-  // Link to a category or income source
   final ExpenseCategory? category;
   final IncomeSource? incomeSource;
 
@@ -29,5 +26,37 @@ class RecurringTransaction {
     this.category,
     this.incomeSource,
   }) : assert(isExpense ? category != null : incomeSource != null);
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'amount': amount,
+      'isExpense': isExpense,
+      'frequency': frequency,
+      // --- THE FIX: Convert DateTime to a JSON-compatible string ---
+      'nextDate': nextDate.toIso8601String(),
+      'endDate': endDate?.toIso8601String(),
+      'neverEnds': neverEnds,
+      'category': category?.toJson(),
+      'incomeSource': incomeSource?.toJson(),
+    };
+  }
+
+  factory RecurringTransaction.fromFirestore(DocumentSnapshot doc, Map<String, dynamic> data) {
+    return RecurringTransaction(
+      id: doc.id,
+      title: data['title'] ?? 'No Title',
+      amount: (data['amount'] as num?)?.toDouble() ?? 0.0,
+      isExpense: data['isExpense'] ?? true,
+      frequency: data['frequency'] ?? 'Monthly',
+      // --- THE FIX: Parse the string back to a DateTime ---
+      nextDate: data['nextDate'] != null ? DateTime.parse(data['nextDate']) : DateTime.now(),
+      endDate: data['endDate'] != null ? DateTime.parse(data['endDate']) : null,
+      neverEnds: data['neverEnds'] ?? false,
+      category: data['category'] != null ? ExpenseCategory.fromJson(data['category']) : null,
+      incomeSource: data['incomeSource'] != null ? IncomeSource.fromJson(data['incomeSource']) : null,
+    );
+  }
 }
 

@@ -14,10 +14,21 @@ class TransactionListItem extends StatelessWidget {
     final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
     final color = transaction.isExpense ? Colors.redAccent.shade400 : Colors.green.shade600;
     final sign = transaction.isExpense ? '-' : '+';
-    // Use the category icon for expenses and a default icon for income
-    final iconData = transaction.isExpense
-        ? transaction.category!.icon
-        : transaction.incomeSource!.icon;
+
+    // --- THE FIX ---
+    // This logic is now robust and handles the "Encrypted" placeholder case safely.
+    final IconData iconData;
+    // First, check if this is our special placeholder.
+    if (transaction.title == 'Encrypted Data' && transaction.category?.name == 'Locked') {
+      iconData = transaction.category!.icon; // Use the lock icon
+    }
+    // Otherwise, proceed with the original logic for normal transactions.
+    else if (transaction.isExpense) {
+      iconData = transaction.category!.icon;
+    } else {
+      iconData = transaction.incomeSource!.icon;
+    }
+
 
     return Card(
       elevation: 0,
@@ -48,4 +59,3 @@ class TransactionListItem extends StatelessWidget {
     );
   }
 }
-
